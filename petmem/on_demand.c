@@ -28,12 +28,12 @@ petmem_init_process(void)
 	giant_Node->alloc_status = FREE;
 	// We need a LL of available memory, all nodes are FREE
 	INIT_LIST_HEAD(&(giant_Node->vm_list));
-	printk("start: %llu",giant_Node->va_start);
-	printk("end: %llu",giant_Node->va_end);
-	printk("numpages: %llu",giant_Node->num_pages);
-	printk("status: %d",giant_Node->alloc_status); //FREE =11
+	printk("PM_INIT_PROC:start: %llu",giant_Node->va_start);
+	printk("PM_INIT_PROC:end: %llu",giant_Node->va_end);
+	printk("PM_INIT_PROC:numpages: %llu",giant_Node->num_pages);
+	printk("PM_INIT_PROC:status: %d",giant_Node->alloc_status); //FREE =11
 
-	//  mmap tracks free spaces
+	//  mmap tracks all allocations, FREE and ALLOCATED
 
 	struct mem_map * mmap_init = (struct mem_map *)kmalloc(sizeof(struct mem_map), GFP_KERNEL);
 	INIT_LIST_HEAD(&(mmap_init->track_memalloc));
@@ -63,14 +63,50 @@ petmem_deinit_process(struct mem_map * map)
     
 }
 
-
+//https://elixir.free-electrons.com/linux/v4.6/source/mm/vmalloc.c#L1736
 uintptr_t
 petmem_alloc_vspace(struct mem_map * map,
 		    u64              num_pages)
 {
     printk("Memory allocation\n");
-
-    return 0;
+	//Iterate through vmlist to find free node, less than num_pages asked
+	
+	struct vaddr_reg *node, *foundnode, *free_node;
+	foundnode=NULL;
+	list_for_each_entry(node,&(map->track_memalloc),vm_list){
+		
+			if(node->num_pages<num_pages && node->alloc_status == FREE){
+				foundnode=node;
+				break;
+			}
+		
+	}
+	
+	foundnode->alloc_status = ALLOCATE;
+	
+	
+	//Handle size of node 
+	/* if foundnode num_apges same as requested same, return start_addr of node
+	   else 
+		create a new node of left over pages and add to Virtual address space
+	*/
+	if(foundnode->num_pages==num_pages)
+	{
+		return foundnode->num_pages;
+	}
+	
+	u64 foundnode_num_pages= foundnode->num_pages;
+	u64 left_over_pages = foundnode_num_pages - num_pages; //left over pages
+	printk("PM:ALLOC: %llu",left_over_pages);
+	foundnode_num_pages = num_pages; //requested
+	free_node = (struct vaddr_reg*)kmalloc(sizeof(struct vaddr_reg), GFP_KERNEL);
+	free_node->va_start = foundnode->va_start + (num_pages<<12);	
+	free_node->alloc_status = FREE;
+	free_node->num_pages = left_over_pages;
+	printk("PM:start: %llu",foundnode->va_start);
+	return foundnode->va_start;	
+	
+	
 }
 
 void
