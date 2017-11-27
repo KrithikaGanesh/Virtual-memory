@@ -68,14 +68,15 @@ uintptr_t
 petmem_alloc_vspace(struct mem_map * map,
 		    u64              num_pages)
 {
-    printk("Memory allocation\n");
+   	
+	printk("Memory allocation\n");
 	//Iterate through vmlist to find free node, less than num_pages asked
 	
 	struct vaddr_reg *node, *foundnode, *free_node;
 	foundnode=NULL;
 	list_for_each_entry(node,&(map->track_memalloc),vm_list){
 		
-			if(node->num_pages<num_pages && node->alloc_status == FREE){
+			if(node->num_pages>=num_pages && node->alloc_status == FREE){
 				foundnode=node;
 				break;
 			}
@@ -98,13 +99,26 @@ petmem_alloc_vspace(struct mem_map * map,
 	u64 foundnode_num_pages= foundnode->num_pages;
 	u64 left_over_pages = foundnode_num_pages - num_pages; //left over pages
 	printk("PM:ALLOC: %llu",left_over_pages);
-	foundnode_num_pages = num_pages; //requested
+	
 	free_node = (struct vaddr_reg*)kmalloc(sizeof(struct vaddr_reg), GFP_KERNEL);
+	
 	free_node->va_start = foundnode->va_start + (num_pages<<12);	
 	free_node->alloc_status = FREE;
 	free_node->num_pages = left_over_pages;
 	printk("PM:start: %llu",foundnode->va_start);
-	return foundnode->va_start;	
+
+	foundnode->num_pages = num_pages; //requested
+	INIT_LIST_HEAD(&(free_node->vm_list));
+	list_add(&(free_node->vm_list), &(foundnode->vm_list));
+	return foundnode->va_start;
+	/*LOG
+	petmem ioctl
+	[  561.570498] Requested allocation of 8192 bytes
+	[  561.570500] Memory allocation
+	[  561.570501] PM:ALLOC: 33554430
+	[  561.570504] PM:start: 68719476736
+	*/
+	
 	
 	
 }
@@ -133,13 +147,18 @@ petmem_free_vspace(struct mem_map * map,
        1 == not present
        2 == permissions error
 */
-
+/*
+void allocate_pg_for_table(void *mem)
+{
+	unintptr_t pg_table_pg = (uintptr_t)__va(petmem_alloc_pages(1));
+	(pte64_t *) mem->present=1;
+	(pte64_t *) mem->va_start= PAGE_TO_BASE_ADDR( __pa(pg_table_pg ));
+	
+}*/
 int
 petmem_handle_pagefault(struct mem_map * map,
 			uintptr_t        fault_addr,
 			u32              error_code)
 {
-    printk("Page fault!\n");
-
-    return -1;
+   return -1;
 }
