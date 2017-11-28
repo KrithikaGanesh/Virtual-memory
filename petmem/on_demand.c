@@ -171,34 +171,77 @@ petmem_handle_pagefault(struct mem_map * map,
 	pmlindex = PML4E64_INDEX( fault_addr );
 
 	
-	if(!pmlbase[pmlindex].present){//need to allocate page for }
+	if(!pmlbase[pmlindex].present){	
+		
+		uintptr_t pml_page = (uintptr_t)__va(petmem_alloc_pages(1));
+   	    	memset((void *)pml_page, 0, 4096);	    
+		pmlbase[pmlindex].present = 1; 
+       
+		pmlbase[pmlindex].pdp_base_addr = PAGE_TO_BASE_ADDR( __pa(pml_page));
+	
+	}
 	printk("PG_FAULT: PMLbase %d", pmlbase[pmlindex].present);
 	
 	pdpbase = (pdpe64_t *)__va(BASE_TO_PAGE_ADDR(pmlbase[pmlindex].pdp_base_addr ));
 	pdpindex = PML4E64_INDEX( fault_addr );
 
-	if(!pdpbase[pdpindex].present){}
+	if(!pdpbase[pdpindex].present){
+		uintptr_t pdp_page = (uintptr_t)__va(petmem_alloc_pages(1));
+   	    	memset((void *)pdp_page, 0, 4096);	    
+		pdpbase[pdpindex].present = 1;
+		pdpbase[pdpindex].writable = 1;
+        	pdpbase[pdpindex].user_page = 1;
+		pdpbase[pdpindex].pd_base_addr = PAGE_TO_BASE_ADDR( __pa(pdp_page));
+
+
+	}
 	printk("PG_FAULT: PDPbase %d", pdpbase[pdpindex].present);
 	
 	pdebase= (pde64_t *)__va(BASE_TO_PAGE_ADDR( pdpbase[pdpindex].pd_base_addr));
 	pdeindex= PDPE64_INDEX( fault_addr );
 
-	if(!pdebase[pdeindex].present){}
+	if(!pdebase[pdeindex].present){
+		uintptr_t pde_page = (uintptr_t)__va(petmem_alloc_pages(1));
+   	    	memset((void *)pde_page, 0, 4096);	    
+		pdebase[pdeindex].present = 1;
+		pdebase[pdeindex].writable = 1;
+		pdebase[pdeindex].user_page = 1;
+		pdebase[pdeindex].pt_base_addr = PAGE_TO_BASE_ADDR( __pa(pde_page));
+
+
+	}
 	printk("PG_FAULT: PDEbase %d", pdebase[pdeindex].present);
 	
 	ptebase = (pte64_t *)__va( BASE_TO_PAGE_ADDR( pdebase[pdeindex].pt_base_addr ));
 	pteindex = PTE64_INDEX( fault_addr );
 	
-	if(!ptebase[pteindex].present){} 
+	if(!ptebase[pteindex].present){
+		uintptr_t pte_page = (uintptr_t)__va(petmem_alloc_pages(1));
+   	    	memset((void *)pte_page, 0, 4096);	    
+		ptebase[pteindex].present = 1;
+		ptebase[pteindex].writable = 1;
+		ptebase[pteindex].user_page = 1;
+		ptebase[pteindex].page_base_addr = PAGE_TO_BASE_ADDR( __pa(pte_page));
+
+
+	} 
 	printk("PG_FAULT: PTEbase %d", ptebase[pteindex].present);
 
-	return -1;
+	return 0;
 	/*
-	page fault attributes
-	[15453.917626] PG_FAULT: PMLbase 1
-	[15453.917627] PG_FAULT: PDPbase 1
-	[15453.917628] PG_FAULT: PDEbase 0
-	[15453.917629] PG_FAULT: PTEbase 1
+	[17602.852918] Memory allocation
+	[17602.852920] PM:ALLOC: 33554430
+	[17602.852922] PM:start: 68719476736
+	[17602.853148] petmem ioctl
+	[17602.853189] petmem ioctl
+	[17602.853191] PG_FAULT: PMLbase 1
+	[17602.853193] PG_FAULT: PDPbase 1
+	[17602.853203] Allocated 1 pages at 0000000008000000
+	[17602.853205] PG_FAULT: PDEbase 1
+	[17602.853208] Allocated 1 pages at 0000000008001000
+	[17602.853211] PG_FAULT: PTEbase 1
+	[17602.853215] error handling page fault for Addr:0000001000000032 (error=1)
 	*/
+
 }
 
