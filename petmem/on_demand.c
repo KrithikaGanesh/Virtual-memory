@@ -160,5 +160,45 @@ petmem_handle_pagefault(struct mem_map * map,
 			uintptr_t        fault_addr,
 			u32              error_code)
 {
-   return -1;
+	pml4e64_t * pmlbase;
+	pdpe64_t * pdpbase;
+	pde64_t * pdebase;
+	pte64_t * ptebase;
+	int pmlindex, pdpindex, pdeindex, pteindex;
+  
+	//cr3 points to the base of the PML4E64 director
+	pmlbase = (pml4e64_t *) (CR3_TO_PML4E64_VA( get_cr3() )); 
+	pmlindex = PML4E64_INDEX( fault_addr );
+
+	
+	if(!pmlbase[pmlindex].present){//need to allocate page for }
+	printk("PG_FAULT: PMLbase %d", pmlbase[pmlindex].present);
+	
+	pdpbase = (pdpe64_t *)__va(BASE_TO_PAGE_ADDR(pmlbase[pmlindex].pdp_base_addr ));
+	pdpindex = PML4E64_INDEX( fault_addr );
+
+	if(!pdpbase[pdpindex].present){}
+	printk("PG_FAULT: PDPbase %d", pdpbase[pdpindex].present);
+	
+	pdebase= (pde64_t *)__va(BASE_TO_PAGE_ADDR( pdpbase[pdpindex].pd_base_addr));
+	pdeindex= PDPE64_INDEX( fault_addr );
+
+	if(!pdebase[pdeindex].present){}
+	printk("PG_FAULT: PDEbase %d", pdebase[pdeindex].present);
+	
+	ptebase = (pte64_t *)__va( BASE_TO_PAGE_ADDR( pdebase[pdeindex].pt_base_addr ));
+	pteindex = PTE64_INDEX( fault_addr );
+	
+	if(!ptebase[pteindex].present){} 
+	printk("PG_FAULT: PTEbase %d", ptebase[pteindex].present);
+
+	return -1;
+	/*
+	page fault attributes
+	[15453.917626] PG_FAULT: PMLbase 1
+	[15453.917627] PG_FAULT: PDPbase 1
+	[15453.917628] PG_FAULT: PDEbase 0
+	[15453.917629] PG_FAULT: PTEbase 1
+	*/
 }
+
