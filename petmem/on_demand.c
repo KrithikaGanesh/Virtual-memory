@@ -155,6 +155,8 @@ void allocate_pg_for_table(void *mem)
 	(pte64_t *) mem->va_start= PAGE_TO_BASE_ADDR( __pa(pg_table_pg ));
 	
 }*/
+
+//http://v3vee.org/palacios/gitweb/gitweb.cgi?p=palacios.git;a=commitdiff_plain;h=1fe82881720f7f9f64f789871f763aca93b47a7e
 int
 petmem_handle_pagefault(struct mem_map * map,
 			uintptr_t        fault_addr,
@@ -228,20 +230,63 @@ petmem_handle_pagefault(struct mem_map * map,
 	printk("PG_FAULT: PTEbase %d", ptebase[pteindex].present);
 
 	return 0;
+
 	/*
-	[17602.852918] Memory allocation
-	[17602.852920] PM:ALLOC: 33554430
-	[17602.852922] PM:start: 68719476736
-	[17602.853148] petmem ioctl
-	[17602.853189] petmem ioctl
-	[17602.853191] PG_FAULT: PMLbase 1
-	[17602.853193] PG_FAULT: PDPbase 1
-	[17602.853203] Allocated 1 pages at 0000000008000000
-	[17602.853205] PG_FAULT: PDEbase 1
-	[17602.853208] Allocated 1 pages at 0000000008001000
-	[17602.853211] PG_FAULT: PTEbase 1
-	[17602.853215] error handling page fault for Addr:0000001000000032 (error=1)
+	Console output
+	Giving Palacios 128MB of memory at (0x8000000) 
+	Allocated 1 page at 0x1000000000
+	SIGSEGV
+	SIGSEGV
+	SIGSEGV
+	SIGSEGV
+	SIGSEGV
+	SIGSEGV
+	SIGSEGV
 	*/
+
+	/*Log output
+	[19714.000220] PM:start: 68719476736
+	[19714.000561] petmem ioctl
+	[19714.000571] petmem ioctl
+	[19714.000572] PG_FAULT: PMLbase 1
+	[19714.000573] PG_FAULT: PDPbase 1
+	[19714.000576] Allocated 1 pages at 0000000008000000
+	[19714.000577] PG_FAULT: PDEbase 1
+	[19714.000578] Allocated 1 pages at 0000000008001000
+	[19714.000579] PG_FAULT: PTEbase 1
+	[19714.000584] petmem ioctl
+	[19714.000584] PG_FAULT: PMLbase 1
+	[19714.000585] PG_FAULT: PDPbase 1
+	[19714.000585] PG_FAULT: PDEbase 1
+	[19714.000586] PG_FAULT: PTEbase 1
+	[19714.000589] petmem ioctl
+	[19714.000590] PG_FAULT: PMLbase 1
+	[19714.000590] PG_FAULT: PDPbase 1
+	[19714.000591] PG_FAULT: PDEbase 1
+	[19714.000591] PG_FAULT: PTEbase 1
+	[19714.000595] petmem ioctl
+	[19714.000595] PG_FAULT: PMLbase 1
+	[19714.000596] PG_FAULT: PDPbase 1
+	[19714.000596] PG_FAULT: PDEbase 1
+	[19714.000597] PG_FAULT: PTEbase 1
+	[19714.000600] petmem ioctl
+	[19714.000600] PG_FAULT: PMLbase 1
+	[19714.000601] PG_FAULT: PDPbase 1
+	[19714.000601] PG_FAULT: PDEbase 1
+	[19714.000602] PG_FAULT: PTEbase 1
+	[19714.000605] petmem ioctl
+	[19714.000605] PG_FAULT: PMLbase 1
+	[19714.000606] PG_FAULT: PDPbase 1
+	[19714.000606] PG_FAULT: PDEbase 1
+	[19714.000607] PG_FAULT: PTEbase 1
+	[19714.000610] petmem ioctl
+	[19714.000610] PG_FAULT: PMLbase 1
+	[19714.000611] PG_FAULT: PDPbase 1
+	[19714.000611] PG_FAULT: PDEbase 1
+
+	*/
+
+	
 
 }
 
