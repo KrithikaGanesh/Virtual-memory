@@ -156,137 +156,64 @@ void allocate_pg_for_table(void *mem)
 	
 }*/
 
-//http://v3vee.org/palacios/gitweb/gitweb.cgi?p=palacios.git;a=commitdiff_plain;h=1fe82881720f7f9f64f789871f763aca93b47a7e
-int
-petmem_handle_pagefault(struct mem_map * map,
-			uintptr_t        fault_addr,
-			u32              error_code)
-{
-	pml4e64_t * pmlbase;
-	pdpe64_t * pdpbase;
-	pde64_t * pdebase;
-	pte64_t * ptebase;
-	int pmlindex, pdpindex, pdeindex, pteindex;
-  
-	//cr3 points to the base of the PML4E64 director
-	pmlbase = (pml4e64_t *) (CR3_TO_PML4E64_VA( get_cr3() )); 
-	pmlindex = PML4E64_INDEX( fault_addr );
 
+int petmem_handle_pagefault(struct mem_map * map, uintptr_t fault_addr, u32 error_code) {
+	pml4e64_t * pml;
+	pdpe64_t * pdp;
+	pde64_t * pde;
+	pte64_t * pte;
+
+    pml = (pml4e64_t *) (CR3_TO_PML4E64_VA( get_cr3() ) + PML4E64_INDEX( fault_addr ) * 8);
 	
-	if(!pmlbase[pmlindex].present){	
-		
-		uintptr_t pml_page = (uintptr_t)__va(petmem_alloc_pages(1));
-   	    	memset((void *)pml_page, 0, 4096);	    
-		pmlbase[pmlindex].present = 1; 
-       
-		pmlbase[pmlindex].pdp_base_addr = PAGE_TO_BASE_ADDR( __pa(pml_page));
-	
-	}
-	printk("PG_FAULT: PMLbase %d", pmlbase[pmlindex].present);
-	
-	pdpbase = (pdpe64_t *)__va(BASE_TO_PAGE_ADDR(pmlbase[pmlindex].pdp_base_addr ));
-	pdpindex = PML4E64_INDEX( fault_addr );
+    if(!pml->present) {
+	printk("PML");
+        pte64_t * pml_page = (uintptr_t)__va(petmem_alloc_pages(1));
+	memset((void *)pml_page, 0, 4096);	    
+	pml->present = 1;
+	pml->pdp_base_addr = PAGE_TO_BASE_ADDR( __pa(pml_page));
+    }
 
-	if(!pdpbase[pdpindex].present){
-		uintptr_t pdp_page = (uintptr_t)__va(petmem_alloc_pages(1));
-   	    	memset((void *)pdp_page, 0, 4096);	    
-		pdpbase[pdpindex].present = 1;
-		pdpbase[pdpindex].writable = 1;
-        	pdpbase[pdpindex].user_page = 1;
-		pdpbase[pdpindex].pd_base_addr = PAGE_TO_BASE_ADDR( __pa(pdp_page));
+    pdp = (pdpe64_t *)__va( BASE_TO_PAGE_ADDR(pml->pdp_base_addr ) + (PDPE64_INDEX( fault_addr ) * 8)) ;
+    if(!pdp->present) {
+	printk("PDP");        
+	pdpe64_t * pdp_page = (pdpe64_t *)__va(petmem_alloc_pages(1));
+    	memset((void *)pdp_page, 0, 4096);	    
+	pdp->present = 1;
+	pdp->pd_base_addr = PAGE_TO_BASE_ADDR( __pa(pdp_page));
+        pdp->writable = 1;
+        pdp->user_page = 1;
 
+    }
 
-	}
-	printk("PG_FAULT: PDPbase %d", pdpbase[pdpindex].present);
-	
-	pdebase= (pde64_t *)__va(BASE_TO_PAGE_ADDR( pdpbase[pdpindex].pd_base_addr));
-	pdeindex= PDPE64_INDEX( fault_addr );
+    pde = (pde64_t *)__va(BASE_TO_PAGE_ADDR( pdp->pd_base_addr ) + PDE64_INDEX( fault_addr )* 8);
+    if(!pde->present) {
+	printk("PDE");        
+	pde64_t * pde_page = (pde64_t *)__va(petmem_alloc_pages(1));	
+   	memset((void *)pde_page, 0, 4096);	    
+	pde->present = 1;
+	pde->pt_base_addr = PAGE_TO_BASE_ADDR( __pa(pde_page));
+        pde->writable = 1;
+        pde->user_page = 1;
+    }
 
-	if(!pdebase[pdeindex].present){
-		uintptr_t pde_page = (uintptr_t)__va(petmem_alloc_pages(1));
-   	    	memset((void *)pde_page, 0, 4096);	    
-		pdebase[pdeindex].present = 1;
-		pdebase[pdeindex].writable = 1;
-		pdebase[pdeindex].user_page = 1;
-		pdebase[pdeindex].pt_base_addr = PAGE_TO_BASE_ADDR( __pa(pde_page));
+    pte = (pte64_t *)__va( BASE_TO_PAGE_ADDR( pde->pt_base_addr ) + PTE64_INDEX( fault_addr ) * 8 );
 
-
-	}
-	printk("PG_FAULT: PDEbase %d", pdebase[pdeindex].present);
-	
-	ptebase = (pte64_t *)__va( BASE_TO_PAGE_ADDR( pdebase[pdeindex].pt_base_addr ));
-	pteindex = PTE64_INDEX( fault_addr );
-	
-	if(!ptebase[pteindex].present){
-		uintptr_t pte_page = (uintptr_t)__va(petmem_alloc_pages(1));
-   	    	memset((void *)pte_page, 0, 4096);	    
-		ptebase[pteindex].present = 1;
-		ptebase[pteindex].writable = 1;
-		ptebase[pteindex].user_page = 1;
-		ptebase[pteindex].page_base_addr = PAGE_TO_BASE_ADDR( __pa(pte_page));
-
-
-	} 
-	printk("PG_FAULT: PTEbase %d", ptebase[pteindex].present);
-
+    if(!pte->present) {
+	printk("PTE");        
+	pte64_t * datapage = (pte64_t *)__va(petmem_alloc_pages(1));    	
+       	memset((void *)datapage, 0, 4096);    
+	pte->present = 1;
+	pte->page_base_addr = PAGE_TO_BASE_ADDR( __pa(datapage));        
+        pte->writable = 1;
+        pte->user_page =1;
+    }
 	return 0;
-
 	/*
-	Console output
-	Giving Palacios 128MB of memory at (0x8000000) 
 	Allocated 1 page at 0x1000000000
 	SIGSEGV
-	SIGSEGV
-	SIGSEGV
-	SIGSEGV
-	SIGSEGV
-	SIGSEGV
-	SIGSEGV
+	Hello World!
 	*/
-
-	/*Log output
-	[19714.000220] PM:start: 68719476736
-	[19714.000561] petmem ioctl
-	[19714.000571] petmem ioctl
-	[19714.000572] PG_FAULT: PMLbase 1
-	[19714.000573] PG_FAULT: PDPbase 1
-	[19714.000576] Allocated 1 pages at 0000000008000000
-	[19714.000577] PG_FAULT: PDEbase 1
-	[19714.000578] Allocated 1 pages at 0000000008001000
-	[19714.000579] PG_FAULT: PTEbase 1
-	[19714.000584] petmem ioctl
-	[19714.000584] PG_FAULT: PMLbase 1
-	[19714.000585] PG_FAULT: PDPbase 1
-	[19714.000585] PG_FAULT: PDEbase 1
-	[19714.000586] PG_FAULT: PTEbase 1
-	[19714.000589] petmem ioctl
-	[19714.000590] PG_FAULT: PMLbase 1
-	[19714.000590] PG_FAULT: PDPbase 1
-	[19714.000591] PG_FAULT: PDEbase 1
-	[19714.000591] PG_FAULT: PTEbase 1
-	[19714.000595] petmem ioctl
-	[19714.000595] PG_FAULT: PMLbase 1
-	[19714.000596] PG_FAULT: PDPbase 1
-	[19714.000596] PG_FAULT: PDEbase 1
-	[19714.000597] PG_FAULT: PTEbase 1
-	[19714.000600] petmem ioctl
-	[19714.000600] PG_FAULT: PMLbase 1
-	[19714.000601] PG_FAULT: PDPbase 1
-	[19714.000601] PG_FAULT: PDEbase 1
-	[19714.000602] PG_FAULT: PTEbase 1
-	[19714.000605] petmem ioctl
-	[19714.000605] PG_FAULT: PMLbase 1
-	[19714.000606] PG_FAULT: PDPbase 1
-	[19714.000606] PG_FAULT: PDEbase 1
-	[19714.000607] PG_FAULT: PTEbase 1
-	[19714.000610] petmem ioctl
-	[19714.000610] PG_FAULT: PMLbase 1
-	[19714.000611] PG_FAULT: PDPbase 1
-	[19714.000611] PG_FAULT: PDEbase 1
-
-	*/
-
-	
 
 }
+
 
