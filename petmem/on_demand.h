@@ -31,6 +31,7 @@ struct vaddr_reg {
 struct mem_map {
     /* Add your own state here */
 	struct list_head track_memalloc;
+	
 };
 
 
