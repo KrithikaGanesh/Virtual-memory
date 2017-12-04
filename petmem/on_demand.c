@@ -161,7 +161,7 @@ petmem_handle_pagefault(struct mem_map * map,
       pdp_index = PDPE64_INDEX(fault_addr);
       pde_index = PDE64_INDEX(fault_addr);
       pte_index = PTE64_INDEX(fault_addr);
-      printk("Page fault at %lx err %d cr3 %lx pml %lx pdp %lx pd %lx pt %lx\n", fault_addr, error_code, get_cr3(), pml4, pdp, pde, pte);
+      printk("Page fault at %lx err %d cr3 %lx pml %lx pdp %lx pd %lx pt %lx\n", fault_addr, error_code, get_cr3(), pml_index, pdp_index, pde_index, pte_index);
       pml4 = (struct pml4e64 *) ( CR3_TO_PML4E64_VA(get_cr3()) + pml_index * sizeof(struct pml4e64));
       if(pml4->present == 0) {
          pml4->present = 1;
