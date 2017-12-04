@@ -9,12 +9,15 @@
 #include<unistd.h>
 void check_for_multiple_processes();
 void check_malloc();
+void handle_invalid_address();
+void alloc_more_than_virtual();
+
 int main(int argc, char ** argv) {
     check_malloc();
+    alloc_more_than_virtual();
+    handle_invalid_address();
+
     check_for_multiple_processes();
-
-
-
     return 0;
 }
 
@@ -77,6 +80,29 @@ void check_malloc()
     {
         printf("Malloc returns NULL pointer:PASS\n");
     }
+    printf("--------------------------------------------\n");
+
+}
+void alloc_more_than_virtual()
+{
+    printf("Allocating more than virtual address space\n");
+    init_petmem();
+    char * b = pet_malloc(100000000000000);
+    printf("Address %p\n",b);
+    printf("--------------------------------------------\n");
 
 
 }
+void handle_invalid_address()
+{
+    printf("Handle invalid address\n");
+    init_petmem();
+    char * buf;
+    buf = 0x1000000123;
+    buf[0] = 'c';
+    pet_free(buf);
+    //printf("%s\n", (char *)buf[0]);
+    printf("--------------------------------------------\n");
+}
+
+
