@@ -284,7 +284,18 @@ int petmem_handle_pagefault(struct mem_map * map, uintptr_t fault_addr, u32 erro
 	pdpe64_t * pdp;
 	pde64_t * pde;
 	pte64_t * pte;
+    int valid;
+    struct vaddr_reg * node;
+    list_for_each_entry(node, &(map->track_memalloc), vm_list){
+        if(node->alloc_status == ALLOCATE && fault_addr >= node->va_start && fault_addr < (node->va_start + 4096 * node->num_pages)){
+            valid=1;
+        }
 
+    }
+    if(!valid)
+    {
+        return -1;
+    }
     pml = (pml4e64_t *) (CR3_TO_PML4E64_VA( get_cr3() ) + PML4E64_INDEX( fault_addr ) * 8);
 	
     if(!pml->present) {
