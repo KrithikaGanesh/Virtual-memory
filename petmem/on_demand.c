@@ -60,6 +60,10 @@ petmem_alloc_vspace(struct mem_map * map,
 {
 	printk("Memory allocation\n");
 	//Iterate through vmlist to find free node, less than num_pages asked
+    if(num_pages == 0)
+    {
+        return NULL;
+    }
 	struct vaddr_reg *node, *foundnode, *free_node;
 	foundnode=NULL;
 	list_for_each_entry(node,&(map->track_memalloc),vm_list){
@@ -69,7 +73,10 @@ petmem_alloc_vspace(struct mem_map * map,
 				break;
 			}
 	}
-	
+    if(foundnode == NULL)
+    {
+        return;
+    }
 	foundnode->alloc_status = ALLOCATE;
 	//Handle size of node
 	/* if foundnode num_apges same as requested same, return start_addr of node

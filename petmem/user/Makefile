@@ -5,7 +5,8 @@ CFLAGS =
 LIB_OBJS = harness.a
 
 OBJS =  petmem \
-	test
+	test \
+	mytest
 
 build = \
 	@if [ -z "$V" ]; then \
