@@ -6,11 +6,18 @@
 
 
 struct vaddr_reg {
-    /* You can use this to record each virtual address allocation */
+    int occupied;
+    uintptr_t addr_start;
+//    uintptr_t addr_end;
+    u64 size;
+    struct vaddr_reg * next;
+    struct vaddr_reg * prev;    
 };
 
 struct mem_map {
-    /* Add your own state here */
+    uintptr_t br;
+    struct vaddr_reg * start;
+    struct vaddr_reg * end;
 };
 
 
