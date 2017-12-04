@@ -122,7 +122,107 @@ petmem_free_vspace(struct mem_map * map,
 		   uintptr_t        vaddr)
 {
     printk("Free Memory\n");
+    if(map == NULL || vaddr == NULL) return;
+    struct vaddr_reg * node;
+    for(node = map->start; node != NULL; node = node->next) {
+      if(node->addr_start == vaddr) {
+        break;
+      }
+    }
+    if(node == NULL) return;
+    free_pagetable(node,vaddr);
+    node->occupied = 0;
+    if(node->next == NULL) {
+      node->prev->next = NULL;
+      kfree(node);      
+    }
+    if(node->next != NULL && node->next->occupied == 0) {
+      node->size += node->next->size;
+      node->next = node->next->next;
+      if(node->next != NULL)
+        node->next->prev = node;
+      kfree(node->next);
+    }
+    if(node->prev != NULL && node->prev->occupied == 0) {
+      node = node->prev;
+      node->size += node->next->size;
+      node->next = node->next->next;
+      if(node->next != NULL)
+        node->next->prev = node;
+      kfree(node->next);
+    }
     return;
+}
+
+void free_pagetable(struct vaddr_reg * node, uintptr_t vaddr) {
+  int i,j,pteflag = 1,pdeflag = 1,pdpflag = 1;
+  u64 pml_index, pdp_index, pde_index, pte_index;
+  for(i = 0; i < node->size; i++) {
+    pml_index = PML4E64_INDEX(vaddr);
+    pdp_index = PDPE64_INDEX(vaddr);
+    pde_index = PDE64_INDEX(vaddr);
+    pte_index = PTE64_INDEX(vaddr);
+    vaddr += PAGE_SIZE_4KB;
+    struct pml4e64 * pml4;
+    struct pdpe64 * pdp;
+    struct pde64 * pde;
+    struct pte64 * pte;
+    printk("Page free at %lx cr3 %lx pml %lx pdp %lx pd %lx pt %lx\n", vaddr, get_cr3(), pml_index, pdp_index, pde_index, pte_index);
+    pml4 = (struct pml4e64 *) ( CR3_TO_PML4E64_VA(get_cr3()) + pml_index * sizeof(struct pml4e64));
+    if(pml4->present == 1) {
+      pdp = (struct pdpe64 *) (__va(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr)) + pdp_index * sizeof(struct pdpe64));
+      if(pdp->present == 1) {
+        pde = (struct pde64 *) (__va(BASE_TO_PAGE_ADDR(pdp->pd_base_addr)) + pde_index * sizeof(struct pde64));
+        if(pde->present == 1) {
+          pte = (struct pte64 *) (__va(BASE_TO_PAGE_ADDR(pde->pt_base_addr)) + pte_index * sizeof(struct pte64));
+          if(pte->present == 1) {
+            petmem_free_pages(BASE_TO_PAGE_ADDR(pte->page_base_addr),1);
+            invlpg(__va(pte->page_base_addr));
+            pte->writable = pte->user_page = pte->page_base_addr = pte->present = 0;
+          }
+          struct pte64 * ptepages = (struct pte64 *)__va(BASE_TO_PAGE_ADDR(pde->pt_base_addr));
+          for(j = 0; j < MAX_PTE64_ENTRIES; j++) {
+            if(ptepages->present == 1) {
+              pteflag = 0;
+              break;
+            }
+            ptepages += 1;
+          }
+          if(pteflag == 1) {
+            petmem_free_pages(BASE_TO_PAGE_ADDR(pde->pt_base_addr),1);
+            invlpg(__va(pde->pt_base_addr));
+            pde->writable = pde->user_page = pde->pt_base_addr = pde->present = 0;
+          }
+        }
+        struct pde64 * pdepages = (struct pde64 *)__va(BASE_TO_PAGE_ADDR(pdp->pd_base_addr));
+        for(j = 0; j < MAX_PDE64_ENTRIES; j++) {
+          if(pdepages->present == 1) {
+            pdeflag = 0;
+            break;
+          }
+          pdepages += 1;
+        }
+        if(pdeflag == 1) {
+          petmem_free_pages(BASE_TO_PAGE_ADDR(pdp->pd_base_addr),1);
+          invlpg(__va(pdp->pd_base_addr));
+          pdp->writable = pdp->user_page = pdp->pd_base_addr = pdp->present = 0;
+        }
+      }
+      struct pdpe64 * pdppages = (struct pdpe64 *)__va(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr));
+      for(j = 0; j < MAX_PDPE64_ENTRIES; j++) {
+        if(pdppages->present == 1) {
+          pdpflag = 0;
+          break;
+        }
+        pdppages += 1;
+      }
+      if(pdpflag == 1) {
+        petmem_free_pages(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr),1);
+        invlpg(__va(pml4->pdp_base_addr));
+        pml4->writable = pml4->user_page = pml4->pdp_base_addr = pml4->present = 0;
+      }
+    }  
+  }
 }
 
 
