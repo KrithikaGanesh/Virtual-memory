@@ -14,9 +14,9 @@
 #define PAGE_NOT_IN_USE 2
 #define ERROR_PERMISSION 2
 
-void attempt_free_physical_address(uintptr_t address);
+void free_pa(uintptr_t address);
 
-// https://www.ibm.com/developerworks/library/l-kernel-memory-access/index.html
+
 struct mem_map *
 petmem_init_process(void)
 {
@@ -54,9 +54,6 @@ petmem_init_process(void)
 	[ 8938.241544] status: 11
 	*/
 
-
-
-   
 }
 
 
@@ -67,7 +64,7 @@ petmem_deinit_process(struct mem_map * map)
 	struct vaddr_reg *entry;
 	list_for_each_safe(node, temp, &(map->track_memalloc)){
 		entry = list_entry(node, struct vaddr_reg, vm_list);
-        attempt_free_physical_address(entry->va_start);
+        free_pa(entry->va_start);
         invlpg(entry->va_start);
 		list_del(node);
 		kfree(entry);
@@ -141,13 +138,12 @@ petmem_dump_vspace(struct mem_map * map)
     return;
 }
 
-int is_entire_page_free(void * page_structure){
+int is_page_in_use(void * page_structure){
     int i = 0;
     for(i = 0; i < 512; i++){
         int offset = i * 8;
         pte64_t * page = __va(page_structure + offset);
-        if(page->present == 1){
-            printk("Page index is: %d\n", i);
+        if(page->present == 1){       
             return PAGE_IN_USE;
         }
     }
@@ -155,21 +151,21 @@ int is_entire_page_free(void * page_structure){
 }
 
 
-void attempt_free_physical_address(uintptr_t address){
+void free_pa(uintptr_t address){
 
- 	pml4e64_t * cr3;
+ 	pml4e64_t * pml;
 	pdpe64_t * pdp, *pdp_table;
 	pde64_t * pde, *pde_table;
 	pte64_t * pte, *pte_table;
     void * actual_mem;
-    
+    int present_flag = 0,i;
 
-    cr3 = (pml4e64_t *) (CR3_TO_PML4E64_VA( get_cr3() ) + PML4E64_INDEX( address ) * 8);
-    if(!cr3->present) {
+    pml = (pml4e64_t *) (CR3_TO_PML4E64_VA( get_cr3() ) + PML4E64_INDEX( address ) * 8);
+    if(!pml->present) {
         return;
     }
-    pdp = (pdpe64_t *)__va( BASE_TO_PAGE_ADDR( cr3->pdp_base_addr ) + (PDPE64_INDEX( address ) * 8)) ;
-    pdp_table = (pdpe64_t *)( BASE_TO_PAGE_ADDR( cr3->pdp_base_addr )) ;
+    pdp = (pdpe64_t *)__va( BASE_TO_PAGE_ADDR( pml->pdp_base_addr ) + (PDPE64_INDEX( address ) * 8)) ;
+    pdp_table = (pdpe64_t *)( BASE_TO_PAGE_ADDR( pml->pdp_base_addr )) ;
     if(!pdp->present) {
         return;
     }
@@ -195,39 +191,62 @@ void attempt_free_physical_address(uintptr_t address){
     pte->present = 0;
     pte->page_base_addr = 0;
     invlpg(pte_table);
-    if(is_entire_page_free((void *)pte_table) == PAGE_NOT_IN_USE){
-        printk("Freeing pte table\n");
+	for(i = 0; i < 512; i++){
+        	int offset = i * 8;
+        	if(((pte64_t *)(__va(pte_table+offset)))->present == 1){ 
+			present_flag = 1;
+			break;
+		}
+}
+    if(!present_flag){        
        petmem_free_pages((uintptr_t)pte_table, 1);
     }
     else{
+	
         return;
     }
     pde->writable = 0;
     pde->user_page = 0;
     pde->present = 0;
     pde->pt_base_addr = 0;
-    if(is_entire_page_free((void *)pde_table) == PAGE_NOT_IN_USE){
-        printk("Freeing pde table\n");
+	present_flag = 0;
+	for(i = 0; i < 512; i++){
+        	int offset = i * 8;
+        	if(((pde64_t *)(__va(pde_table+offset)))->present == 1){ 
+			present_flag = 1;
+			break;
+		}
+}
+     if(!present_flag){        
        petmem_free_pages((uintptr_t)pde_table, 1);
     }
     else{
+	
         return;
     }
     pdp->writable = 0;
     pdp->user_page = 0;
     pdp->present = 0;
     pdp->pd_base_addr = 0;
-    if(is_entire_page_free((void *)pdp_table) == PAGE_NOT_IN_USE){
-        printk("Freeing pdp table\n");
+present_flag = 0;
+    for(i = 0; i < 512; i++){
+        	int offset = i * 8;
+        	if(((pdpe64_t *)(__va(pdp_table+offset)))->present == 1){ 
+			present_flag = 1;
+			break;
+		}
+}
+     if(!present_flag){        
        petmem_free_pages((uintptr_t)pdp_table, 1);
     }
     else{
+	
         return;
     }
-    cr3->present = 0;
-    cr3->pdp_base_addr = 0;
-    cr3->user_page = 0;
-    cr3->writable = 0;
+    pml->present = 0;
+    pml->pdp_base_addr = 0;
+    pml->user_page = 0;
+    pml->writable = 0;
 
 }
 
@@ -257,7 +276,7 @@ petmem_free_vspace(struct mem_map * map,
 	}
 	
 	foundnode->alloc_status = FREE;
-	attempt_free_physical_address(foundnode->va_start);
+	free_pa(foundnode->va_start);
 
 	for(i = 0; i< foundnode->num_pages;i++)
 	{
