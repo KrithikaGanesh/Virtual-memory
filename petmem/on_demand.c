@@ -35,7 +35,13 @@ petmem_init_process(void)
 void
 petmem_deinit_process(struct mem_map * map)
 {
-    
+  struct vaddr_reg * temp, * node;
+  for(node = map->start; node != NULL; node = temp) {
+    free_pagetable(node,node->addr_start);
+    temp = node->next;
+    kfree(node);
+  }
+  kfree(map);
 }
 
 
@@ -154,9 +160,10 @@ petmem_free_vspace(struct mem_map * map,
     return;
 }
 
-void free_pagetable(struct vaddr_reg * node, uintptr_t vaddr) {
+void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr) {
   int i,j,pteflag = 1,pdeflag = 1,pdpflag = 1;
   u64 pml_index, pdp_index, pde_index, pte_index;
+//  struct vaddr_reg * node = (struct vaddr_reg *) vaddr;
   for(i = 0; i < node->size; i++) {
     pml_index = PML4E64_INDEX(vaddr);
     pdp_index = PDPE64_INDEX(vaddr);
