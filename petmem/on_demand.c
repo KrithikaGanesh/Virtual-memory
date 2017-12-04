@@ -143,7 +143,7 @@ petmem_handle_pagefault(struct mem_map * map,
     printk("error code = %lx",error_code);
     if(map == NULL) return -1;
     struct vaddr_reg * node;
-    for(node = map->head; node != NULL; node = node->next) {
+    for(node = map->start; node != NULL; node = node->next) {
       if(fault_addr > node->addr_start && fault_addr < (node->addr_start + node->size * PAGE_SIZE)) {
         break;
       }
