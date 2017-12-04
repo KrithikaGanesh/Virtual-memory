@@ -11,13 +11,15 @@ void check_for_multiple_processes();
 void check_malloc();
 void handle_invalid_address();
 void alloc_more_than_virtual();
+void check_free();
 
 int main(int argc, char ** argv) {
     check_malloc();
     alloc_more_than_virtual();
-    handle_invalid_address();
+    check_free();
 
     check_for_multiple_processes();
+    //handle_invalid_address();
     return 0;
 }
 
@@ -105,4 +107,10 @@ void handle_invalid_address()
     printf("--------------------------------------------\n");
 }
 
-
+void check_free()
+{
+    printf("Freeing NULL\n");
+    pet_free(NULL);
+    printf("Unaffected: no operation\n");
+    printf("--------------------------------------------\n");
+}
