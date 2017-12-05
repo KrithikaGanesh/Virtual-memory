@@ -188,16 +188,16 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
     printk("Page free at %lx cr3 %lx pml %lx pdp %lx pd %lx pt %lx\n", vaddr, cr3, pml_index, pdp_index, pde_index, pte_index);
     pml4 = (struct pml4e64 *) ( CR3_TO_PML4E64_VA(cr3) + pml_index * sizeof(struct pml4e64));
     if(pml4->present == 1) {
-      printk("************PML4 present");
+      printk("************PML4 present  addr : %lx",pml4);
       pdp = (struct pdpe64 *) (__va(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr)) + pdp_index * sizeof(struct pdpe64));
       if(pdp->present == 1) {
-        printk("************PDP present");
+        printk("************PDP present addr : %lx",pdp);
         pde = (struct pde64 *) (__va(BASE_TO_PAGE_ADDR(pdp->pd_base_addr)) + pde_index * sizeof(struct pde64));
         if(pde->present == 1) {
-          printk("************PDE present");
+          printk("************PDE present addr : %lx",pde);
           pte = (struct pte64 *) (__va(BASE_TO_PAGE_ADDR(pde->pt_base_addr)) + pte_index * sizeof(struct pte64));
           if(pte->present == 1) {
-            printk("**********************************PTE BEFORE FREEEEEE***************");
+            printk("**********************************PTE BEFORE FREEEEEE***************   addr : %lx",pte);
             petmem_free_pages(BASE_TO_PAGE_ADDR(pte->page_base_addr),1);
             invlpg(__va(pte->page_base_addr));
             pte->writable = pte->user_page = pte->page_base_addr = pte->present = 0;
@@ -293,6 +293,7 @@ petmem_handle_pagefault(struct mem_map * map,
       pte_index = PTE64_INDEX(fault_addr);
       printk("Page fault at %lx err %d cr3 %lx pml %lx pdp %lx pd %lx pt %lx\n", fault_addr, error_code, map->cr3, pml_index, pdp_index, pde_index, pte_index);
       pml4 = (struct pml4e64 *) ( CR3_TO_PML4E64_VA(map->cr3) + pml_index * sizeof(struct pml4e64));
+      printk("pml4 insert addr : %lx",pml4);
       if(pml4->present == 0) {
          pml4->present = 1;
          pml4->writable = 1;
@@ -301,6 +302,7 @@ petmem_handle_pagefault(struct mem_map * map,
          memset(__va(pml4->pdp_base_addr),0,PAGE_SIZE_4KB);
       }
       pdp = (struct pdpe64 *) (__va(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr)) + pdp_index * sizeof(struct pdpe64));
+      printk("pdp insert addr : %lx",pdp);
       if(pdp->present == 0) {
          pdp->present = 1;
          pdp->writable = 1;
@@ -309,6 +311,7 @@ petmem_handle_pagefault(struct mem_map * map,
          memset(__va(pdp->pd_base_addr),0,PAGE_SIZE_4KB);
       }
       pde = (struct pde64 *) (__va(BASE_TO_PAGE_ADDR(pdp->pd_base_addr)) + pde_index * sizeof(struct pde64));
+      printk("pde insert addr : %lx",pde);
       if(pde->present == 0) {
          pde->present = 1;
          pde->writable = 1;
@@ -317,6 +320,7 @@ petmem_handle_pagefault(struct mem_map * map,
          memset(__va(pde->pt_base_addr),0,PAGE_SIZE_4KB);
       }
       pte = (struct pte64 *) (__va(BASE_TO_PAGE_ADDR(pde->pt_base_addr)) + pte_index * sizeof(struct pte64));
+      printk("pte insert addr : %lx",pte);
       if(pte->present == 0) {
          pte->present = 1;
          pte->writable = 1;
