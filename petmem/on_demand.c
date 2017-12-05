@@ -193,6 +193,7 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
       if(pdp->present == 1) {
         printk("************PDP present addr : %lx",pdp);
         pde = (struct pde64 *) (__va(BASE_TO_PAGE_ADDR(pdp->pd_base_addr)) + pde_index * sizeof(struct pde64));
+        printk("************ BEFORE CHECK *** PDE present addr : %lx",pde);
         if(pde->present == 1) {
           printk("************PDE present addr : %lx",pde);
           pte = (struct pte64 *) (__va(BASE_TO_PAGE_ADDR(pde->pt_base_addr)) + pte_index * sizeof(struct pte64));
@@ -223,7 +224,7 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
         for(j = 0; j < MAX_PDE64_ENTRIES; j++) {
           if(pdepages->present == 1) {
             pdeflag = 0;
-            printk("******** Data still available in PDE -- Don't deallocate %d********",j);
+            printk("******** Data still available in PDE -- Don't deallocate %d\t %lx********",j,pdepages);
             break;
           }
           pdepages += 1;
@@ -239,7 +240,7 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
       for(j = 0; j < MAX_PDPE64_ENTRIES; j++) {
         if(pdppages->present == 1) {
           pdpflag = 0;
-          printk("******** Data still available in PDP -- Don't deallocate %d********",j);
+          printk("******** Data still available in PDP -- Don't deallocate %d\t%lx********",j,pdppages);
           break;
         }
         pdppages += 1;
