@@ -39,8 +39,8 @@ petmem_deinit_process(struct mem_map * map)
   printk("****************************deinit**************");
   struct vaddr_reg * temp, * node;
   for(node = map->start; node != NULL; node = temp) {
-    free_pagetable(node,node->addr_start,map->cr3);
     temp = node->next;
+    free_pagetable(node,node->addr_start,map->cr3);    
     kfree(node);
   }
   kfree(map);
