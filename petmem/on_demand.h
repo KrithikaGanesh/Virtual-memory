@@ -18,6 +18,7 @@ struct mem_map {
     uintptr_t br;
     struct vaddr_reg * start;
     struct vaddr_reg * end;
+    u64 cr3;
 };
 
 
@@ -38,3 +39,5 @@ void petmem_dump_vspace(struct mem_map * map);
 int petmem_handle_pagefault(struct mem_map * map,
 			    uintptr_t        fault_addr,
 			    u32              error_code);
+
+void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3);
