@@ -201,6 +201,7 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
             printk("**********************************PTE BEFORE FREEEEEE***************   addr : %lx",pte);
             petmem_free_pages(BASE_TO_PAGE_ADDR(pte->page_base_addr),1);
             invlpg(__va(pte->page_base_addr));
+		  invlpg(vaddr);
             pte->writable = pte->user_page = pte->page_base_addr = pte->present = 0;
             printk("************PTE AFTER FREE *******************");
           }
