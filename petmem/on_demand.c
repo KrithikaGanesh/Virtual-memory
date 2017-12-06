@@ -39,8 +39,8 @@ petmem_deinit_process(struct mem_map * map)
   printk("****************************deinit**************");
   struct vaddr_reg * temp, * node;
   for(node = map->start; node != NULL; node = temp) {
+    free_pagetable(node,node->addr_start,map->cr3);
     temp = node->next;
-    free_pagetable(node,node->addr_start,map->cr3);    
     kfree(node);
   }
   kfree(map);
@@ -171,10 +171,11 @@ petmem_free_vspace(struct mem_map * map,
 
 void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
   printk("************FREE PAGETABLE ******************* DATA = %");
-  int i,j,pteflag = 1,pdeflag = 1,pdpflag = 1;
+  int i,j,pteflag,pdeflag,pdpflag;
   u64 pml_index, pdp_index, pde_index, pte_index;
 //  struct vaddr_reg * node = (struct vaddr_reg *) vaddr;
   for(i = 0; i < node->size; i++) {
+    pteflag = 1; pdeflag = 1; pdpflag = 1;
     printk("************************** iiiiiiiii = %d",i);
     pml_index = PML4E64_INDEX(vaddr);
     pdp_index = PDPE64_INDEX(vaddr);
@@ -200,8 +201,8 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
           if(pte->present == 1) {
             printk("**********************************PTE BEFORE FREEEEEE***************   addr : %lx",pte);
             petmem_free_pages(BASE_TO_PAGE_ADDR(pte->page_base_addr),1);
-            invlpg(__va(pte->page_base_addr));
-		  invlpg(vaddr);
+            invlpg(__va(BASE_TO_PAGE_ADDR(pte->page_base_addr)));
+            invlpg(vaddr);
             pte->writable = pte->user_page = pte->page_base_addr = pte->present = 0;
             printk("************PTE AFTER FREE *******************");
           }
@@ -217,7 +218,7 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
           if(pteflag == 1) {
             printk("DEALLOCATING PTE ENTRY IN PDE");
             petmem_free_pages(BASE_TO_PAGE_ADDR(pde->pt_base_addr),1);
-            invlpg(__va(pde->pt_base_addr));
+            invlpg(__va(BASE_TO_PAGE_ADDR(pde->pt_base_addr)));
             pde->writable = pde->user_page = pde->pt_base_addr = pde->present = 0;
           }
         }
@@ -225,7 +226,7 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
         for(j = 0; j < MAX_PDE64_ENTRIES; j++) {
           if(pdepages->present == 1) {
             pdeflag = 0;
-            printk("******** Data still available in PDE -- Don't deallocate %d\t %lx********",j,pdepages);
+            printk("******** Data still available in PDE -- Don't deallocate %d\t %lx %p********",j,pdepages, pde);
             break;
           }
           pdepages += 1;
@@ -233,7 +234,7 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
         if(pdeflag == 1) {
           printk("DEALLOCATING PDE ENTRY IN PDP");
           petmem_free_pages(BASE_TO_PAGE_ADDR(pdp->pd_base_addr),1);
-          invlpg(__va(pdp->pd_base_addr));
+          invlpg(__va(BASE_TO_PAGE_ADDR(pdp->pd_base_addr)));
           pdp->writable = pdp->user_page = pdp->pd_base_addr = pdp->present = 0;
         }
       }
@@ -249,10 +250,11 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
       if(pdpflag == 1) {
         printk("DEALLOCATING PDP ENTRY IN PML");
         petmem_free_pages(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr),1);
-        invlpg(__va(pml4->pdp_base_addr));
+        invlpg(__va(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr)));
         pml4->writable = pml4->user_page = pml4->pdp_base_addr = pml4->present = 0;
       }
-    }  
+    }
+    vaddr += PAGE_SIZE_4KB;  
   }
 }
 
@@ -295,31 +297,31 @@ petmem_handle_pagefault(struct mem_map * map,
       pte_index = PTE64_INDEX(fault_addr);
       printk("Page fault at %lx err %d cr3 %lx pml %lx pdp %lx pd %lx pt %lx\n", fault_addr, error_code, map->cr3, pml_index, pdp_index, pde_index, pte_index);
       pml4 = (struct pml4e64 *) ( CR3_TO_PML4E64_VA(map->cr3) + pml_index * sizeof(struct pml4e64));
-      printk("pml4 insert addr : %lx",pml4);
+      printk("pml4 insert addr : %lx %d",pml4, pml4->present);
       if(pml4->present == 0) {
          pml4->present = 1;
          pml4->writable = 1;
          pml4->user_page = 1;
          pml4->pdp_base_addr = PAGE_TO_BASE_ADDR(petmem_alloc_pages(1));
-         memset(__va(pml4->pdp_base_addr),0,PAGE_SIZE_4KB);
+         memset(__va(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr)),0,PAGE_SIZE_4KB);
       }
       pdp = (struct pdpe64 *) (__va(BASE_TO_PAGE_ADDR(pml4->pdp_base_addr)) + pdp_index * sizeof(struct pdpe64));
-      printk("pdp insert addr : %lx",pdp);
+      printk("pdp insert addr : %lx %d\n",pdp, pdp->present);
       if(pdp->present == 0) {
          pdp->present = 1;
          pdp->writable = 1;
          pdp->user_page = 1;
          pdp->pd_base_addr = PAGE_TO_BASE_ADDR(petmem_alloc_pages(1));
-         memset(__va(pdp->pd_base_addr),0,PAGE_SIZE_4KB);
+         memset(__va(BASE_TO_PAGE_ADDR(pdp->pd_base_addr)),0,PAGE_SIZE_4KB);
       }
       pde = (struct pde64 *) (__va(BASE_TO_PAGE_ADDR(pdp->pd_base_addr)) + pde_index * sizeof(struct pde64));
-      printk("pde insert addr : %lx",pde);
+      printk("pde insert addr : %lx %d\n",pde, pde->present);
       if(pde->present == 0) {
          pde->present = 1;
          pde->writable = 1;
          pde->user_page = 1;
          pde->pt_base_addr = PAGE_TO_BASE_ADDR(petmem_alloc_pages(1));
-         memset(__va(pde->pt_base_addr),0,PAGE_SIZE_4KB);
+         memset(__va(BASE_TO_PAGE_ADDR(pde->pt_base_addr)),0,PAGE_SIZE_4KB);
       }
       pte = (struct pte64 *) (__va(BASE_TO_PAGE_ADDR(pde->pt_base_addr)) + pte_index * sizeof(struct pte64));
       printk("pte insert addr : %lx",pte);
@@ -328,9 +330,10 @@ petmem_handle_pagefault(struct mem_map * map,
          pte->writable = 1;
          pte->user_page = 1;
          pte->page_base_addr = PAGE_TO_BASE_ADDR(petmem_alloc_pages(1));
-         memset(__va(pte->page_base_addr),0,PAGE_SIZE_4KB);
+         memset(__va(BASE_TO_PAGE_ADDR(pte->page_base_addr)),0,PAGE_SIZE_4KB);
       }
       printk("return success");
+
       return 0;
     }
     return -1;
