@@ -181,7 +181,6 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
     pdp_index = PDPE64_INDEX(vaddr);
     pde_index = PDE64_INDEX(vaddr);
     pte_index = PTE64_INDEX(vaddr);
-    vaddr += PAGE_SIZE_4KB;
     struct pml4e64 * pml4;
     struct pdpe64 * pdp;
     struct pde64 * pde;
