@@ -3,17 +3,13 @@
  */
 
 #include <linux/slab.h>
-
-
 #include "petmem.h"
 #include "on_demand.h"
 #include "pgtables.h"
 
-
-
-
-
-
+/* Creating memory map and virtual address region
+   Assigning the virtual address region to memory map
+*/
 struct mem_map *
 petmem_init_process(void)
 {
@@ -22,7 +18,6 @@ petmem_init_process(void)
     struct vaddr_reg * reg = kmalloc(sizeof(struct vaddr_reg), GFP_KERNEL);
     reg->occupied = 0;
     map->br = reg->addr_start = PETMEM_REGION_START;
-//    reg->addr_end = PETMEM_REGION_END;
     reg->next = reg->prev = NULL;
     reg->size = NULL;
     map->start = map->end = reg;
@@ -32,6 +27,9 @@ petmem_init_process(void)
     return map;
 }
 
+/*
+   Deallocating memory map and virtual address region
+*/  
 
 void
 petmem_deinit_process(struct mem_map * map)
@@ -46,11 +44,18 @@ petmem_deinit_process(struct mem_map * map)
   kfree(map);
 }
 
+/* Creating a new virtual address region node
+   Checking if the size of the node is greater than equal to the required size
+   Making the node as occupied and make the newly created node as unoccupied 
+   New node size = virtual address region - occupied size and adding new node to list
+   returning the virtual address 
+  */
 
 uintptr_t
 petmem_alloc_vspace(struct mem_map * map,
 		    u64              num_pages)
 {
+    
     printk("Memory Allocation Start");
     uintptr_t * returnaddr;
     struct vaddr_reg * reg, * next_vaddr;
@@ -60,17 +65,15 @@ petmem_alloc_vspace(struct mem_map * map,
       printk("Map is NULL ??");
       return NULL;
     }
+    reg = map->start;
     do{
+      
       printk("Inside Do");
-      reg = map->start;
       if(reg == NULL) {
         printk("reg == NULL???");
         return NULL;
       }
-      /*if(reg->occupied){
-        printk("Already OCCUPIED ?");
-        return NULL;
-      }*/
+     
       if(!reg->occupied){
          printk("FREE NODE Found");
          if(reg->size == NULL || reg->size > num_pages) {
@@ -79,6 +82,7 @@ petmem_alloc_vspace(struct mem_map * map,
            next_vaddr->addr_start = reg->addr_start + num_pages * PAGE_SIZE_4KB;
            printk("Next Block Start_addr = %lx", next_vaddr->addr_start);
            reg->next = next_vaddr;
+           printk("=====reg->next = %lx\t%lx",reg->next,next_vaddr);
            next_vaddr->prev = reg;
            next_vaddr->next = NULL;
            reg->occupied = 1;
@@ -102,12 +106,13 @@ petmem_alloc_vspace(struct mem_map * map,
            reg = reg->next;
          }
       }
-      printk("reg->next = %lx",reg->next);
-    } while(reg->next != NULL);
+      printk("reg->next = %lx",reg);
+    } while((reg=reg->next) != NULL);
     printk("Memory allocation End\n");
     return NULL;
 }
 
+/* Debugging */
 void
 petmem_dump_vspace(struct mem_map * map)
 {
@@ -125,8 +130,10 @@ petmem_dump_vspace(struct mem_map * map)
 
 
 
-
-// Only the PML needs to stay, everything else can be freed
+/* Finding the node with given vaddr
+   Calling the method which frees the page table structure for that virtual address structure
+   Coalesing the linked list
+*/
 void
 petmem_free_vspace(struct mem_map * map,
 		   uintptr_t        vaddr)
@@ -169,11 +176,17 @@ petmem_free_vspace(struct mem_map * map,
     return;
 }
 
+/* Traversing to the whole page structure of the given virtual address
+   deallocating and invalidating the physical memory 
+   for all 4 page table hierarchies 	
+      if all the page table entries are 0, then deallocating and invalidating the entire page
+*/
+
 void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
   printk("************FREE PAGETABLE ******************* DATA = %");
   int i,j,pteflag,pdeflag,pdpflag;
   u64 pml_index, pdp_index, pde_index, pte_index;
-//  struct vaddr_reg * node = (struct vaddr_reg *) vaddr;
+
   for(i = 0; i < node->size; i++) {
     pteflag = 1; pdeflag = 1; pdpflag = 1;
     printk("************************** iiiiiiiii = %d",i);
@@ -264,6 +277,11 @@ void free_pagetable(struct vaddr_reg * node,uintptr_t vaddr, u64 cr3) {
        2 == permissions error
 */
 
+/* finding the node with the given virtual address 
+   creating pages at all the 4 level, if not present
+   setting all page entries to 0
+   create the data page
+*/
 int
 petmem_handle_pagefault(struct mem_map * map,
 			uintptr_t        fault_addr,
@@ -334,6 +352,5 @@ petmem_handle_pagefault(struct mem_map * map,
       printk("return success");
 
       return 0;
-    }
-    return -1;
+}
 }
